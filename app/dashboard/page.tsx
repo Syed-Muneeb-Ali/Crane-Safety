@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { fetchWithAuth } from '@/lib/auth-client';
+import LoadingSpinner from '@/components/LoadingSpinner';
 import {
   LineChart,
   Line,
@@ -48,7 +49,9 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <Layout>
-        <div>Loading dashboard...</div>
+        <div className="flex justify-center items-center min-h-[400px]">
+          <LoadingSpinner size="lg" />
+        </div>
       </Layout>
     );
   }

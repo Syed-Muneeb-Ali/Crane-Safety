@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import Layout from '@/components/Layout';
 import { fetchWithAuth } from '@/lib/auth-client';
-import Link from 'next/link';
 import { format } from 'date-fns';
+import IncidentModal from '@/components/IncidentModal';
+import LoadingSpinner from '@/components/LoadingSpinner';
 
 interface Event {
   id: number;
@@ -16,11 +17,17 @@ interface Event {
   shift_name: string | null;
   severity: string;
   event_type: string;
+  reviewed: boolean;
 }
 
 export default function IncidentsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
+  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [filters, setFilters] = useState({
     date_from: '',
     date_to: '',
@@ -36,11 +43,12 @@ export default function IncidentsPage() {
   useEffect(() => {
     loadShifts();
     loadFilters();
-    loadEvents();
   }, []);
 
   useEffect(() => {
-    loadEvents();
+    setPage(1);
+    setEvents([]);
+    loadEvents(1, true);
   }, [filters]);
 
   const loadShifts = async () => {
@@ -66,24 +74,49 @@ export default function IncidentsPage() {
     }
   };
 
-  const loadEvents = async () => {
-    setLoading(true);
+  const loadEvents = async (pageNum: number = 1, reset: boolean = false) => {
+    if (reset) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value);
       });
+      params.append('page', pageNum.toString());
+      params.append('limit', '50');
       const response = await fetchWithAuth(`/api/events?${params.toString()}`);
       const data = await response.json();
-      setEvents(data.events);
+      
+      if (reset) {
+        setEvents(data.events);
+      } else {
+        setEvents([...events, ...data.events]);
+      }
+      
+      setHasMore(data.pagination.page < data.pagination.totalPages);
+      setPage(pageNum);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   };
 
+  const handleLoadMore = () => {
+    loadEvents(page + 1, false);
+  };
+
+  const handleEventReviewed = () => {
+    // Reload events to update reviewed status
+    loadEvents(1, true);
+  };
+
   const handleExport = async (format: 'pdf' | 'csv') => {
+    setExporting(format);
     try {
       const response = await fetchWithAuth('/api/reports/export', {
         method: 'POST',
@@ -102,7 +135,25 @@ export default function IncidentsPage() {
       document.body.removeChild(a);
     } catch (error) {
       console.error('Error exporting:', error);
+      alert('Failed to export report');
+    } finally {
+      setExporting(null);
     }
+  };
+
+  const clearFilter = (key: string) => {
+    setFilters({ ...filters, [key]: '' });
+  };
+
+  const clearAllFilters = () => {
+    setFilters({
+      date_from: '',
+      date_to: '',
+      event_type: '',
+      crane_id: '',
+      operator: '',
+      shift_id: '',
+    });
   };
 
   return (
@@ -112,110 +163,245 @@ export default function IncidentsPage() {
 
         {/* Filters */}
         <div className="bg-white p-4 rounded-lg shadow mb-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-semibold">Filters</h2>
+            <button
+              onClick={clearAllFilters}
+              className="text-sm text-gray-600 hover:text-gray-800 underline"
+            >
+              Clear All
+            </button>
+          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
               <label className="block text-sm font-medium mb-1">Date Range</label>
               <div className="flex gap-2">
-                <input
-                  type="date"
-                  value={filters.date_from}
-                  onChange={(e) =>
-                    setFilters({ ...filters, date_from: e.target.value })
-                  }
-                  className="flex-1 px-3 py-2 border rounded-md"
-                />
-                <input
-                  type="date"
-                  value={filters.date_to}
-                  onChange={(e) =>
-                    setFilters({ ...filters, date_to: e.target.value })
-                  }
-                  className="flex-1 px-3 py-2 border rounded-md"
-                />
+                <div className="flex-1 relative">
+                  <input
+                    type="date"
+                    value={filters.date_from}
+                    onChange={(e) =>
+                      setFilters({ ...filters, date_from: e.target.value })
+                    }
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      filters.date_from ? 'pr-8' : ''
+                    }`}
+                  />
+                  {filters.date_from && (
+                    <button
+                      onClick={() => clearFilter('date_from')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+                <div className="flex-1 relative">
+                  <input
+                    type="date"
+                    value={filters.date_to}
+                    onChange={(e) =>
+                      setFilters({ ...filters, date_to: e.target.value })
+                    }
+                    className={`w-full px-3 py-2 border rounded-md ${
+                      filters.date_to ? 'pr-8' : ''
+                    }`}
+                  />
+                  {filters.date_to && (
+                    <button
+                      onClick={() => clearFilter('date_to')}
+                      className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
                 Red / Yellow Filter
               </label>
-              <select
-                value={filters.event_type}
-                onChange={(e) =>
-                  setFilters({ ...filters, event_type: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="">All</option>
-                <option value="red">Red Zone</option>
-                <option value="yellow">Yellow Zone</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.event_type}
+                  onChange={(e) =>
+                    setFilters({ ...filters, event_type: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 border rounded-md appearance-none bg-white ${
+                    filters.event_type ? 'pr-10' : 'pr-8'
+                  }`}
+                >
+                  <option value="">All</option>
+                  <option value="red">Red Zone</option>
+                  <option value="yellow">Yellow Zone</option>
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                {filters.event_type && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearFilter('event_type');
+                    }}
+                    className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">
-                Crane / Operator Filter
+                Crane ID
               </label>
-              <select
-                value={filters.crane_id}
-                onChange={(e) =>
-                  setFilters({ ...filters, crane_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="">All Cranes</option>
-                {craneIds.map((id) => (
-                  <option key={id} value={id}>
-                    {id}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.crane_id}
+                  onChange={(e) =>
+                    setFilters({ ...filters, crane_id: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 border rounded-md appearance-none bg-white ${
+                    filters.crane_id ? 'pr-10' : 'pr-8'
+                  }`}
+                >
+                  <option value="">All Cranes</option>
+                  {craneIds.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                {filters.crane_id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearFilter('crane_id');
+                    }}
+                    className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Operator</label>
-              <select
-                value={filters.operator}
-                onChange={(e) =>
-                  setFilters({ ...filters, operator: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="">All Operators</option>
-                {operators.map((op) => (
-                  <option key={op} value={op}>
-                    {op}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.operator}
+                  onChange={(e) =>
+                    setFilters({ ...filters, operator: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 border rounded-md appearance-none bg-white ${
+                    filters.operator ? 'pr-10' : 'pr-8'
+                  }`}
+                >
+                  <option value="">All Operators</option>
+                  {operators.map((op) => (
+                    <option key={op} value={op}>
+                      {op}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                {filters.operator && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearFilter('operator');
+                    }}
+                    className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Shift</label>
-              <select
-                value={filters.shift_id}
-                onChange={(e) =>
-                  setFilters({ ...filters, shift_id: e.target.value })
-                }
-                className="w-full px-3 py-2 border rounded-md"
-              >
-                <option value="">All Shifts</option>
-                {shifts.map((shift) => (
-                  <option key={shift.id} value={shift.id}>
-                    {shift.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.shift_id}
+                  onChange={(e) =>
+                    setFilters({ ...filters, shift_id: e.target.value })
+                  }
+                  className={`w-full px-3 py-2 border rounded-md appearance-none bg-white ${
+                    filters.shift_id ? 'pr-10' : 'pr-8'
+                  }`}
+                >
+                  <option value="">All Shifts</option>
+                  {shifts.map((shift) => (
+                    <option key={shift.id} value={shift.id}>
+                      {shift.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                  <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+                {filters.shift_id && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearFilter('shift_id');
+                    }}
+                    className="absolute right-6 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 z-10 bg-white rounded-full w-5 h-5 flex items-center justify-center text-sm font-bold"
+                    type="button"
+                  >
+                    ×
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <button
               onClick={() => handleExport('pdf')}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 mr-2"
+              disabled={exporting !== null}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Export PDF
+              {exporting === 'pdf' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Exporting PDF...
+                </>
+              ) : (
+                'Export PDF'
+              )}
             </button>
             <button
               onClick={() => handleExport('csv')}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+              disabled={exporting !== null}
+              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              Export CSV
+              {exporting === 'csv' ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  Exporting CSV...
+                </>
+              ) : (
+                'Export CSV'
+              )}
             </button>
           </div>
         </div>
@@ -245,6 +431,9 @@ export default function IncidentsPage() {
                     Severity
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Reviewed
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Actions
                   </th>
                 </tr>
@@ -252,13 +441,15 @@ export default function IncidentsPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center">
-                      Loading...
+                    <td colSpan={8} className="px-6 py-4 text-center">
+                      <div className="flex justify-center">
+                        <LoadingSpinner />
+                      </div>
                     </td>
                   </tr>
                 ) : events.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-6 py-4 text-center">
+                    <td colSpan={8} className="px-6 py-4 text-center">
                       No incidents found
                     </td>
                   </tr>
@@ -300,12 +491,23 @@ export default function IncidentsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <Link
-                          href={`/incidents/${event.id}`}
-                          className="text-primary-600 hover:text-primary-800"
+                        <span
+                          className={`px-2 py-1 rounded text-xs font-medium ${
+                            event.reviewed
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {event.reviewed ? 'Yes' : 'No'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => setSelectedEventId(event.id)}
+                          className="text-primary-600 hover:text-primary-800 font-medium"
                         >
                           View
-                        </Link>
+                        </button>
                       </td>
                     </tr>
                   ))
@@ -313,9 +515,32 @@ export default function IncidentsPage() {
               </tbody>
             </table>
           </div>
+          {!loading && hasMore && (
+            <div className="p-4 text-center border-t">
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loadingMore ? (
+                  <span className="flex items-center gap-2">
+                    <LoadingSpinner size="sm" />
+                    Loading...
+                  </span>
+                ) : (
+                  'Load More'
+                )}
+              </button>
+            </div>
+          )}
         </div>
+        
+        <IncidentModal
+          eventId={selectedEventId}
+          onClose={() => setSelectedEventId(null)}
+          onReviewed={handleEventReviewed}
+        />
       </div>
     </Layout>
   );
 }
-

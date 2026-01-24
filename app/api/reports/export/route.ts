@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
-import { Parser } from 'papaparse';
+import Papa from 'papaparse';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const events = result.rows;
 
     if (format === 'csv') {
-      const csv = Parser.unparse(events.map((e: any) => ({
+      const csv = Papa.unparse(events.map((e: any) => ({
         'Event ID': e.event_id,
         'Event Type': e.event_type,
         'Timestamp': e.timestamp,

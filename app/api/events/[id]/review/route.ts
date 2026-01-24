@@ -7,7 +7,7 @@ export async function POST(
 ) {
   try {
     const result = await pool.query(
-      'UPDATE events SET updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
+      'UPDATE events SET reviewed = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
       [params.id]
     );
 

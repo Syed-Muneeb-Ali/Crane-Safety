@@ -8,7 +8,9 @@
     "start": "next start",
     "lint": "next lint",
     "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed-users.js"
+    "db:seed": "node scripts/seed-users.js",
+    "db:seed-dummy": "node scripts/seed-dummy-data.js",
+    "db:add-reviewed": "node scripts/add-reviewed-column.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
