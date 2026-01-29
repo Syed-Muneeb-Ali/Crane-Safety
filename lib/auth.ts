@@ -6,7 +6,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 
 export interface User {
   id: number;
-  email: string;
+  username: string;
   role: 'admin' | 'viewer';
   name: string;
 }
@@ -23,12 +23,12 @@ export async function verifyPassword(
 }
 
 export async function authenticateUser(
-  email: string,
+  username: string,
   password: string
 ): Promise<User | null> {
   const result = await pool.query(
-    'SELECT id, email, password_hash, role, name FROM users WHERE email = $1',
-    [email]
+    'SELECT id, username, password_hash, role, name FROM users WHERE username = $1',
+    [username]
   );
 
   if (result.rows.length === 0) {
@@ -44,7 +44,7 @@ export async function authenticateUser(
 
   return {
     id: user.id,
-    email: user.email,
+    username: user.username,
     role: user.role,
     name: user.name,
   };
@@ -52,7 +52,7 @@ export async function authenticateUser(
 
 export function generateToken(user: User): string {
   return jwt.sign(
-    { id: user.id, email: user.email, role: user.role },
+    { id: user.id, username: user.username, role: user.role, name: user.name },
     JWT_SECRET,
     { expiresIn: '7d' }
   );
@@ -63,12 +63,36 @@ export function verifyToken(token: string): User | null {
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     return {
       id: decoded.id,
-      email: decoded.email,
+      username: decoded.username,
       role: decoded.role,
       name: decoded.name || '',
     };
   } catch {
     return null;
   }
+}
+
+export async function updateUserUsername(userId: number, newUsername: string): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE users SET username = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id',
+    [newUsername, userId]
+  );
+  return result.rowCount !== null && result.rowCount > 0;
+}
+
+export async function updateUserPassword(userId: number, newPasswordHash: string): Promise<boolean> {
+  const result = await pool.query(
+    'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING id',
+    [newPasswordHash, userId]
+  );
+  return result.rowCount !== null && result.rowCount > 0;
+}
+
+export async function getUserById(userId: number): Promise<{ username: string; password_hash: string } | null> {
+  const result = await pool.query(
+    'SELECT username, password_hash FROM users WHERE id = $1',
+    [userId]
+  );
+  return result.rows[0] || null;
 }
 

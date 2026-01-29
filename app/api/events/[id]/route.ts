@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import pool from '@/lib/db';
+import { verifyToken } from '@/lib/auth';
 
 export async function GET(
   request: NextRequest,
@@ -39,6 +40,18 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    const authHeader = request.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const user = verifyToken(authHeader.substring(7));
+    if (!user || user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Only admins can add or edit remarks' },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const updates: string[] = [];
     const values: any[] = [];

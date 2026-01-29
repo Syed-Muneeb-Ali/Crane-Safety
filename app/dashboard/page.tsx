@@ -9,6 +9,7 @@ import {
   Line,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -67,44 +68,33 @@ export default function DashboardPage() {
   return (
     <Layout>
       <div>
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
+        <h1 className="text-3xl font-display font-bold mb-6 text-surface-900">Dashboard</h1>
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">
-              Total Incidents
-            </h3>
-            <p className="text-3xl font-bold">{stats.total_incidents}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">
-              Red Zone Events
-            </h3>
-            <p className="text-3xl font-bold text-red-600">
-              {stats.red_zone_events}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">
-              Yellow Zone Events
-            </h3>
-            <p className="text-3xl font-bold text-yellow-600">
-              {stats.yellow_zone_events}
-            </p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-gray-600 text-sm font-medium mb-2">
-              Active Cranes
-            </h3>
-            <p className="text-3xl font-bold">{stats.active_cranes}</p>
-          </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          {[
+            { label: 'Total Incidents', value: stats.total_incidents, color: 'text-surface-900' },
+            { label: 'Red Zone Events', value: stats.red_zone_events, color: 'text-red-600' },
+            { label: 'Yellow Zone Events', value: stats.yellow_zone_events, color: 'text-amber-600' },
+            { label: 'Active Cranes', value: stats.active_cranes, color: 'text-primary-600' },
+          ].map((card, i) => (
+            <div
+              key={card.label}
+              className="card px-5 py-4 animate-fade-in-up flex flex-col justify-center min-h-0"
+              style={{ animationDelay: `${i * 80}ms`, animationFillMode: 'backwards' }}
+            >
+              <h3 className="text-gray-600 text-sm font-medium mb-1">
+                {card.label}
+              </h3>
+              <p className={`text-2xl font-bold font-display leading-tight ${card.color}`}>{card.value}</p>
+            </div>
+          ))}
         </div>
 
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-4">Incidents Trend</h3>
+          <div className="card p-6 animate-fade-in-up" style={{ animationDelay: '200ms', animationFillMode: 'backwards' }}>
+            <h3 className="text-lg font-semibold mb-4 text-surface-900">Incidents Trend</h3>
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={stats.incidents_trend}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -122,8 +112,8 @@ export default function DashboardPage() {
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-4">Event Breakdown</h3>
+          <div className="card p-6 animate-fade-in-up" style={{ animationDelay: '280ms', animationFillMode: 'backwards' }}>
+            <h3 className="text-lg font-semibold mb-4 text-surface-900">Event Breakdown</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={stats.event_breakdown}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -131,7 +121,11 @@ export default function DashboardPage() {
                 <YAxis />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="count" fill="#0ea5e9" />
+                <Bar dataKey="count">
+                  {stats.event_breakdown.map((entry, index) => (
+                    <Cell key={index} fill={entry.type === 'red' ? '#ef4444' : '#eab308'} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>

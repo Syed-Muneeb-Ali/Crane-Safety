@@ -141,21 +141,21 @@ export default function AnalyticsPage() {
   return (
     <Layout>
       <div>
-        <h1 className="text-3xl font-bold mb-6">Reports & Analytics</h1>
+        <h1 className="text-3xl font-display font-bold mb-6 text-surface-900">Reports & Analytics</h1>
 
         {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
+        <div className="card p-6 mb-6 animate-fade-in-up">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Filters</h2>
+            <h2 className="text-lg font-semibold text-surface-900">Filters</h2>
             <button
               onClick={clearAllFilters}
-              className="text-sm text-gray-600 hover:text-gray-800 underline"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
             >
               Clear All
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">Date Range</label>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -279,11 +279,11 @@ export default function AnalyticsPage() {
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3">
             <button
               onClick={() => handleExport('pdf')}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {exporting === 'pdf' ? (
                 <>
@@ -297,7 +297,7 @@ export default function AnalyticsPage() {
             <button
               onClick={() => handleExport('csv')}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {exporting === 'csv' ? (
                 <>
@@ -312,7 +312,7 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Incident Stats */}
-        <div className="bg-white p-6 rounded-lg shadow mb-6">
+        <div className="card p-6 mb-6 animate-fade-in-up" style={{ animationDelay: '80ms', animationFillMode: 'backwards' }}>
           <h2 className="text-lg font-semibold mb-4">Incident Stats</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
@@ -382,20 +382,23 @@ export default function AnalyticsPage() {
             <div className="bg-white p-6 rounded-lg shadow">
               <h3 className="text-lg font-semibold mb-4 text-gray-800">Shift Distribution</h3>
               <ResponsiveContainer width="100%" height={350}>
-                <BarChart data={data.shift_wise} margin={{ bottom: 60 }}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis 
-                    dataKey="shift" 
+                <BarChart
+                  data={data.shift_wise}
+                  margin={{ top: 20, right: 24, left: 20, bottom: 20 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="shift"
                     angle={-45}
                     textAnchor="end"
                     height={80}
                     tick={{ fontSize: 11 }}
                     interval={0}
                   />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} width={40} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="count" fill="#0ea5e9" />
+                  <Bar dataKey="count" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -407,20 +410,22 @@ export default function AnalyticsPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">Operator-wise Incidents</h2>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.operator_wise} margin={{ bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="operator" 
+              <BarChart
+                data={data.operator_wise}
+                margin={{ top: 20, right: 24, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="operator"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                   tick={{ fontSize: 11 }}
                   interval={0}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} width={40} />
                 <Tooltip />
-                <Legend />
-                <Bar dataKey="count" fill="#0ea5e9" />
+                <Bar dataKey="count" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -429,20 +434,23 @@ export default function AnalyticsPage() {
           <div className="bg-white p-6 rounded-lg shadow">
             <h2 className="text-lg font-semibold mb-4 text-gray-800">Crane-wise Distribution</h2>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={data.crane_wise} margin={{ bottom: 60 }}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis 
-                  dataKey="crane_id" 
+              <BarChart
+                data={data.crane_wise}
+                margin={{ top: 20, right: 24, left: 20, bottom: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="crane_id"
                   angle={-45}
                   textAnchor="end"
                   height={80}
                   tick={{ fontSize: 11 }}
                   interval={0}
                 />
-                <YAxis tick={{ fontSize: 12 }} />
+                <YAxis tick={{ fontSize: 12 }} width={40} />
                 <Tooltip />
                 <Legend />
-                <Bar dataKey="count" fill="#10b981" />
+                <Bar dataKey="count" fill="#10b981" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

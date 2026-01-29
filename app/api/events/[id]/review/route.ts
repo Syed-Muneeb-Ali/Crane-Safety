@@ -6,9 +6,17 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
+    let reviewed = true;
+    try {
+      const body = await request.json();
+      if (typeof body.reviewed === 'boolean') reviewed = body.reviewed;
+    } catch {
+      // no body or invalid JSON – default to true (mark as reviewed)
+    }
+
     const result = await pool.query(
-      'UPDATE events SET reviewed = TRUE, updated_at = CURRENT_TIMESTAMP WHERE id = $1 RETURNING *',
-      [params.id]
+      'UPDATE events SET reviewed = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+      [reviewed, params.id]
     );
 
     if (result.rows.length === 0) {
@@ -19,7 +27,7 @@ export async function POST(
     }
 
     return NextResponse.json({
-      message: 'Event marked as reviewed',
+      message: reviewed ? 'Event marked as reviewed' : 'Event unmarked as reviewed',
       event: result.rows[0],
     });
   } catch (error) {

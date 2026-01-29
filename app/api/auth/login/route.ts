@@ -3,20 +3,20 @@ import { authenticateUser, generateToken } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password } = await request.json();
+    const { username, password } = await request.json();
 
-    if (!email || !password) {
+    if (!username || !password) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Username and password are required' },
         { status: 400 }
       );
     }
 
-    const user = await authenticateUser(email, password);
+    const user = await authenticateUser(username, password);
 
     if (!user) {
       return NextResponse.json(
-        { error: 'Invalid email or password. Please check your credentials or run: npm run db:seed' },
+        { error: 'Invalid username or password. Please check your credentials or run: npm run db:seed' },
         { status: 401 }
       );
     }
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const response = NextResponse.json({
       user: {
         id: user.id,
-        email: user.email,
+        username: user.username,
         role: user.role,
         name: user.name,
       },

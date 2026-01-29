@@ -44,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex">
       <Sidebar />
-      <main className="flex-1 p-8 bg-gray-50 min-h-screen">{children}</main>
+      <main className="flex-1 p-8 bg-surface-50 min-h-screen animate-fade-in">{children}</main>
     </div>
   );
 }

@@ -9,9 +9,20 @@ export async function GET(
 ) {
   try {
     const buffer = await getImageBuffer(params.key);
+    
+    // Determine content type based on file extension
+    let contentType = 'image/jpeg';
+    if (params.key.toLowerCase().endsWith('.avif')) {
+      contentType = 'image/avif';
+    } else if (params.key.toLowerCase().endsWith('.png')) {
+      contentType = 'image/png';
+    } else if (params.key.toLowerCase().endsWith('.webp')) {
+      contentType = 'image/webp';
+    }
+    
     return new NextResponse(buffer.toString('base64'), {
       headers: {
-        'Content-Type': 'image/jpeg',
+        'Content-Type': contentType,
         'Cache-Control': 'public, max-age=3600',
       },
     });

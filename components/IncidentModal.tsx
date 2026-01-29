@@ -20,18 +20,21 @@ interface Event {
   image_reference: string | null;
   remarks: string | null;
   severity: string;
+  reviewed?: boolean;
 }
 
 interface IncidentModalProps {
   eventId: number | null;
   onClose: () => void;
   onReviewed: () => void;
+  canAddRemarks?: boolean; // true for admin only
 }
 
-export default function IncidentModal({ eventId, onClose, onReviewed }: IncidentModalProps) {
+export default function IncidentModal({ eventId, onClose, onReviewed, canAddRemarks = false }: IncidentModalProps) {
   const [event, setEvent] = useState<Event | null>(null);
   const [loading, setLoading] = useState(true);
-  const [updating, setUpdating] = useState(false);
+  const [updatingRemarks, setUpdatingRemarks] = useState(false);
+  const [updatingReviewed, setUpdatingReviewed] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [imageUrl, setImageUrl] = useState<string | null>(null);
 
@@ -60,7 +63,7 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
       setRemarks(data.event.remarks || '');
 
       if (data.event.image_reference) {
-        setImageUrl(`/images/${data.event.image_reference}`);
+        setImageUrl(`/api/images/${data.event.image_reference}`);
       }
     } catch (error) {
       console.error('Error loading event:', error);
@@ -70,7 +73,7 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
   };
 
   const handleUpdateRemarks = async () => {
-    setUpdating(true);
+    setUpdatingRemarks(true);
     try {
       await fetchWithAuth(`/api/events/${eventId}`, {
         method: 'PATCH',
@@ -85,24 +88,28 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
       console.error('Error updating remarks:', error);
       alert('Failed to update remarks');
     } finally {
-      setUpdating(false);
+      setUpdatingRemarks(false);
     }
   };
 
-  const handleMarkReviewed = async () => {
-    setUpdating(true);
+  const handleToggleReviewed = async () => {
+    const newReviewed = !event?.reviewed;
+    setUpdatingReviewed(true);
     try {
       await fetchWithAuth(`/api/events/${eventId}/review`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewed: newReviewed }),
       });
-      alert('Event marked as reviewed');
+      alert(newReviewed ? 'Event marked as reviewed' : 'Event unmarked as reviewed');
+      if (event) setEvent({ ...event, reviewed: newReviewed });
       onReviewed();
-      onClose();
+      if (newReviewed) onClose();
     } catch (error) {
-      console.error('Error marking reviewed:', error);
-      alert('Failed to mark as reviewed');
+      console.error('Error toggling reviewed:', error);
+      alert('Failed to update reviewed status');
     } finally {
-      setUpdating(false);
+      setUpdatingReviewed(false);
     }
   };
 
@@ -110,7 +117,7 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
 
   return (
     <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 animate-fade-in"
       onClick={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -118,14 +125,14 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
       }}
     >
       <div 
-        className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-premium max-w-4xl w-full max-h-[90vh] overflow-y-auto animate-fade-in-up"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-          <h2 className="text-2xl font-bold">Incident Details</h2>
+        <div className="sticky top-0 bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center rounded-t-2xl">
+          <h2 className="text-2xl font-display font-bold text-surface-900">Incident Details</h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+            className="text-gray-500 hover:text-gray-700 text-2xl font-bold w-10 h-10 rounded-xl hover:bg-gray-100 transition-colors"
           >
             ×
           </button>
@@ -209,20 +216,28 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Notes:</label>
-                    <textarea
-                      value={remarks}
-                      onChange={(e) => setRemarks(e.target.value)}
-                      className="mt-1 w-full px-3 py-2 border rounded-md"
-                      rows={4}
-                      placeholder="Add remarks..."
-                    />
-                    <button
-                      onClick={handleUpdateRemarks}
-                      disabled={updating}
-                      className="mt-2 px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 text-sm disabled:opacity-50"
-                    >
-                      {updating ? 'Updating...' : 'Update Remarks'}
-                    </button>
+                    {canAddRemarks ? (
+                      <>
+                        <textarea
+                          value={remarks}
+                          onChange={(e) => setRemarks(e.target.value)}
+                          className="mt-1 w-full px-3 py-2 border rounded-md"
+                          rows={4}
+                          placeholder="Add remarks..."
+                        />
+                        <button
+                          onClick={handleUpdateRemarks}
+                          disabled={updatingRemarks}
+                          className="mt-2 btn-primary text-sm disabled:opacity-50"
+                        >
+                          {updatingRemarks ? 'Updating...' : 'Update Remarks'}
+                        </button>
+                      </>
+                    ) : (
+                      <p className="mt-1 text-gray-700 whitespace-pre-wrap min-h-[4rem]">
+                        {event.remarks || 'No remarks.'}
+                      </p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -233,15 +248,15 @@ export default function IncidentModal({ eventId, onClose, onReviewed }: Incident
           {!loading && event && (
             <div className="mt-6 flex gap-4">
               <button
-                onClick={handleMarkReviewed}
-                disabled={updating}
-                className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                onClick={handleToggleReviewed}
+                disabled={updatingReviewed}
+                className={event.reviewed ? 'btn-secondary' : 'btn-success disabled:opacity-50'}
               >
-                {updating ? 'Processing...' : 'Mark as Reviewed'}
+                {updatingReviewed ? 'Processing...' : event.reviewed ? 'Unmark as Reviewed' : 'Mark as Reviewed'}
               </button>
               <button
                 onClick={onClose}
-                className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+                className="btn-secondary"
               >
                 Close
               </button>

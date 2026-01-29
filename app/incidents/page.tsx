@@ -20,14 +20,24 @@ interface Event {
   reviewed: boolean;
 }
 
+interface User {
+  id: number;
+  username: string;
+  role: 'admin' | 'viewer';
+  name: string;
+}
+
 export default function IncidentsPage() {
   const [events, setEvents] = useState<Event[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
   const [exporting, setExporting] = useState<'pdf' | 'csv' | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const;
+  const [pageSize, setPageSize] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [filters, setFilters] = useState({
     date_from: '',
     date_to: '',
@@ -41,15 +51,27 @@ export default function IncidentsPage() {
   const [operators, setOperators] = useState<string[]>([]);
 
   useEffect(() => {
+    loadUser();
     loadShifts();
     loadFilters();
   }, []);
 
+  const loadUser = async () => {
+    try {
+      const response = await fetchWithAuth('/api/auth/me');
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      }
+    } catch (error) {
+      console.error('Error loading user:', error);
+    }
+  };
+
   useEffect(() => {
     setPage(1);
-    setEvents([]);
-    loadEvents(1, true);
-  }, [filters]);
+    loadEvents(1);
+  }, [filters, pageSize]);
 
   const loadShifts = async () => {
     try {
@@ -74,45 +96,37 @@ export default function IncidentsPage() {
     }
   };
 
-  const loadEvents = async (pageNum: number = 1, reset: boolean = false) => {
-    if (reset) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
+  const loadEvents = async (pageNum: number = 1) => {
+    setLoading(true);
     try {
       const params = new URLSearchParams();
       Object.entries(filters).forEach(([key, value]) => {
         if (value) params.append(key, value);
       });
       params.append('page', pageNum.toString());
-      params.append('limit', '50');
+      params.append('limit', String(pageSize));
       const response = await fetchWithAuth(`/api/events?${params.toString()}`);
       const data = await response.json();
       
-      if (reset) {
-        setEvents(data.events);
-      } else {
-        setEvents([...events, ...data.events]);
-      }
-      
-      setHasMore(data.pagination.page < data.pagination.totalPages);
+      setEvents(data.events);
+      setTotalPages(data.pagination.totalPages);
+      setTotalCount(data.pagination.total);
       setPage(pageNum);
     } catch (error) {
       console.error('Error loading events:', error);
     } finally {
       setLoading(false);
-      setLoadingMore(false);
     }
   };
 
-  const handleLoadMore = () => {
-    loadEvents(page + 1, false);
+  const goToPage = (p: number) => {
+    const next = Math.max(1, Math.min(p, totalPages));
+    setPage(next);
+    loadEvents(next);
   };
 
   const handleEventReviewed = () => {
-    // Reload events to update reviewed status
-    loadEvents(1, true);
+    loadEvents(page);
   };
 
   const handleExport = async (format: 'pdf' | 'csv') => {
@@ -159,21 +173,21 @@ export default function IncidentsPage() {
   return (
     <Layout>
       <div>
-        <h1 className="text-3xl font-bold mb-6">Incident List</h1>
+        <h1 className="text-3xl font-display font-bold mb-6 text-surface-900">Incident List</h1>
 
         {/* Filters */}
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-lg font-semibold">Filters</h2>
+        <div className="card p-6 mb-6 animate-fade-in-up">
+          <div className="flex flex-wrap justify-between items-center gap-4 mb-4">
+            <h2 className="text-lg font-semibold text-surface-900">Filters</h2>
             <button
               onClick={clearAllFilters}
-              className="text-sm text-gray-600 hover:text-gray-800 underline"
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium transition-colors"
             >
               Clear All
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">Date Range</label>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -374,11 +388,11 @@ export default function IncidentsPage() {
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-3">
             <button
               onClick={() => handleExport('pdf')}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {exporting === 'pdf' ? (
                 <>
@@ -392,7 +406,7 @@ export default function IncidentsPage() {
             <button
               onClick={() => handleExport('csv')}
               disabled={exporting !== null}
-              className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {exporting === 'csv' ? (
                 <>
@@ -407,7 +421,7 @@ export default function IncidentsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
+        <div className="card overflow-hidden animate-fade-in-up" style={{ animationDelay: '80ms', animationFillMode: 'backwards' }}>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
@@ -504,7 +518,7 @@ export default function IncidentsPage() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => setSelectedEventId(event.id)}
-                          className="text-primary-600 hover:text-primary-800 font-medium"
+                          className="text-primary-600 hover:text-primary-700 font-medium hover:underline transition-colors"
                         >
                           View
                         </button>
@@ -515,22 +529,66 @@ export default function IncidentsPage() {
               </tbody>
             </table>
           </div>
-          {!loading && hasMore && (
-            <div className="p-4 text-center border-t">
-              <button
-                onClick={handleLoadMore}
-                disabled={loadingMore}
-                className="px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {loadingMore ? (
-                  <span className="flex items-center gap-2">
-                    <LoadingSpinner size="sm" />
-                    Loading...
-                  </span>
-                ) : (
-                  'Load More'
-                )}
-              </button>
+          {!loading && (events.length > 0 || totalCount > 0) && (
+            <div className="flex flex-wrap items-center justify-between gap-4 px-4 py-3 border-t border-gray-200 bg-gray-50/80">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700">Rows per page</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    const v = Number(e.target.value) as 10 | 20 | 30 | 40 | 50;
+                    setPageSize(v);
+                    setPage(1);
+                    loadEvents(1);
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm shadow-sm focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                >
+                  {PAGE_SIZE_OPTIONS.map((n) => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="text-sm text-gray-700">
+                Page {page} of {totalPages || 1}
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => goToPage(1)}
+                  disabled={page <= 1 || loading}
+                  className="p-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  aria-label="First page"
+                >
+                  &laquo;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1 || loading}
+                  className="p-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  aria-label="Previous page"
+                >
+                  &lsaquo;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages || loading}
+                  className="p-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  aria-label="Next page"
+                >
+                  &rsaquo;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => goToPage(totalPages)}
+                  disabled={page >= totalPages || loading}
+                  className="p-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  aria-label="Last page"
+                >
+                  &raquo;
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -539,6 +597,7 @@ export default function IncidentsPage() {
           eventId={selectedEventId}
           onClose={() => setSelectedEventId(null)}
           onReviewed={handleEventReviewed}
+          canAddRemarks={user?.role === 'admin'}
         />
       </div>
     </Layout>
