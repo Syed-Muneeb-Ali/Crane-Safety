@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS shifts (
     shift_manager VARCHAR(255),
     status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (name, start_time, end_time)
 );
 
 -- Events table
@@ -94,10 +95,10 @@ CREATE INDEX IF NOT EXISTS idx_zones_zone_id ON zones(zone_id);
 -- Note: Default users should be created using the seed script (scripts/seed-users.js)
 -- Run: node scripts/seed-users.js after migration
 
--- Insert default shifts
+-- Insert default shifts (idempotent)
 INSERT INTO shifts (name, start_time, end_time, shift_manager) VALUES
 ('Morning Shift', '06:00:00', '14:00:00', 'Manager A'),
 ('Afternoon Shift', '14:00:00', '22:00:00', 'Manager B'),
 ('Night Shift', '22:00:00', '06:00:00', 'Manager C')
-ON CONFLICT DO NOTHING;
+ON CONFLICT (name, start_time, end_time) DO NOTHING;
 
